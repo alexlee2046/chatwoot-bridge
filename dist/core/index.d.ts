@@ -62,7 +62,7 @@ interface ChatwootWidgetApi {
         email?: string;
     }): void;
     setLocale(locale: string): void;
-    setCustomAttributes(attrs: Record<string, string>): void;
+    setConversationCustomAttributes(attrs: Record<string, string>): void;
 }
 declare global {
     interface Window {

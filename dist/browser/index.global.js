@@ -232,7 +232,7 @@
     function reportContext() {
       if (!config.getContext) return;
       if (typeof window === "undefined" || !window.$chatwoot) return;
-      window.$chatwoot.setCustomAttributes(config.getContext());
+      window.$chatwoot.setConversationCustomAttributes(config.getContext());
     }
     const unsubscribers = [
       events.on("ready", () => {
@@ -307,7 +307,7 @@
       if (destroyed) return;
       if (typeof window === "undefined" || !window.$chatwoot) return;
       const resolved = attrs ?? config.getContext?.();
-      if (resolved) window.$chatwoot.setCustomAttributes(resolved);
+      if (resolved) window.$chatwoot.setConversationCustomAttributes(resolved);
     }
     function destroy() {
       if (destroyed) return;

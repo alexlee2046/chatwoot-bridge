@@ -71,7 +71,7 @@ export interface ChatwootWidgetApi {
   toggle(state?: "open" | "close"): void;
   setUser(identifier: string, user: { name?: string; email?: string }): void;
   setLocale(locale: string): void;
-  setCustomAttributes(attrs: Record<string, string>): void;
+  setConversationCustomAttributes(attrs: Record<string, string>): void;
 }
 
 declare global {

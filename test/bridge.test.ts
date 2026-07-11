@@ -52,12 +52,40 @@ describe("identify-before-ready race", () => {
       toggle: vi.fn(),
       setUser: setUserSpy,
       setLocale: vi.fn(),
-      setCustomAttributes: vi.fn(),
+      setConversationCustomAttributes: vi.fn(),
     };
     (window as unknown as { $chatwoot: ChatwootWidgetApi }).$chatwoot = widgetApi;
     window.dispatchEvent(new CustomEvent("chatwoot:ready"));
 
     expect(setUserSpy).toHaveBeenCalledWith("visitor-1", { email: "visitor@example.com" });
+
+    bridge.destroy();
+  });
+});
+
+describe("context reporting", () => {
+  it("reports page context via setConversationCustomAttributes, not the contact-level setCustomAttributes", () => {
+    const setConversationCustomAttributesSpy = vi.fn();
+    const widgetApi: ChatwootWidgetApi = {
+      toggle: vi.fn(),
+      setUser: vi.fn(),
+      setLocale: vi.fn(),
+      setConversationCustomAttributes: setConversationCustomAttributesSpy,
+    };
+    (window as unknown as { $chatwoot: ChatwootWidgetApi }).$chatwoot = widgetApi;
+
+    const bridge = createChatwootBridge({
+      baseUrl: "https://chatwoot.example.com",
+      websiteToken: "token",
+      scriptId: "test-chatwoot-sdk-context",
+      loadStrategy: "lazy",
+      getContext: () => ({ page: "/cart" }),
+    });
+
+    window.dispatchEvent(new CustomEvent("chatwoot:ready"));
+
+    expect(setConversationCustomAttributesSpy).toHaveBeenCalledWith({ page: "/cart" });
+    expect((widgetApi as unknown as { setCustomAttributes?: unknown }).setCustomAttributes).toBeUndefined();
 
     bridge.destroy();
   });
