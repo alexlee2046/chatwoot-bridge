@@ -110,12 +110,12 @@ function tryOpenNow() {
   return true;
 }
 function isChatwootFrameVisible() {
-  if (typeof document === "undefined") return false;
-  const holder = document.getElementById("cw-widget-holder");
-  const iframe = holder?.querySelector("iframe");
-  if (!iframe) return false;
-  const rect = iframe.getBoundingClientRect();
-  return rect.width > 0 && rect.height > 0;
+  if (typeof window === "undefined" || typeof document === "undefined") return false;
+  const widget = document.getElementById("chatwoot_live_chat_widget");
+  if (!(widget instanceof HTMLElement)) return false;
+  const style = window.getComputedStyle(widget);
+  const bounds = widget.getBoundingClientRect();
+  return style.display !== "none" && style.visibility !== "hidden" && bounds.width > 0 && bounds.height > 0;
 }
 function createRetryController(options) {
   let pending = false;
