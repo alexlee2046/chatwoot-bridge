@@ -23,11 +23,11 @@ export function useChatwoot(): {
         requestOpen();
       },
       close: () => {
-        controller.close();
+        controller?.close();
       },
       toggle: () => {
         if (launcherState.widgetOpen) {
-          controller.close();
+          controller?.close();
         } else {
           requestOpen();
         }

@@ -335,52 +335,55 @@ function createChatwootBridge(config) {
 // src/react/provider.tsx
 import { jsx } from "react/jsx-runtime";
 var ChatwootContext = React.createContext(void 0);
+var IDLE_LAUNCHER_STATE = {
+  state: "idle",
+  pending: false,
+  unavailable: false,
+  widgetOpen: false
+};
 function ChatwootProvider(props) {
   const { config, locale, user, children } = props;
-  const controllerRef = React.useRef();
-  if (!controllerRef.current) {
-    controllerRef.current = createChatwootBridge(config);
-  }
-  const controller = controllerRef.current;
-  const [launcherState, setLauncherState] = React.useState(() => ({
-    state: controller.state,
-    pending: false,
-    unavailable: controller.state === "unavailable",
-    widgetOpen: false
-  }));
+  const [controller, setController] = React.useState(null);
+  const [launcherState, setLauncherState] = React.useState(IDLE_LAUNCHER_STATE);
   React.useEffect(() => {
+    const instance = createChatwootBridge(config);
+    setController(instance);
+    setLauncherState({
+      state: instance.state,
+      pending: false,
+      unavailable: instance.state === "unavailable",
+      widgetOpen: false
+    });
     const unsubscribers = [
-      controller.on("ready", () => {
-        setLauncherState((prev) => ({ ...prev, state: controller.state, pending: false }));
+      instance.on("ready", () => {
+        setLauncherState((prev) => ({ ...prev, state: instance.state, pending: false }));
       }),
-      controller.on("opened", () => {
+      instance.on("opened", () => {
         setLauncherState((prev) => ({ ...prev, widgetOpen: true, pending: false }));
       }),
-      controller.on("closed", () => {
+      instance.on("closed", () => {
         setLauncherState((prev) => ({ ...prev, widgetOpen: false }));
       }),
-      controller.on("unavailable", () => {
+      instance.on("unavailable", () => {
         setLauncherState((prev) => ({ ...prev, state: "unavailable", unavailable: true, pending: false }));
       })
     ];
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
+      instance.destroy();
+      setController(null);
     };
-  }, [controller]);
+  }, [config]);
   React.useEffect(() => {
-    controller.setLocale(locale);
+    controller?.setLocale(locale);
   }, [controller, locale]);
   React.useEffect(() => {
-    if (user?.email) {
+    if (controller && user?.email) {
       controller.setUser(user.email, user);
     }
   }, [controller, user?.email, user?.name]);
-  React.useEffect(() => {
-    return () => {
-      controller.destroy();
-    };
-  }, [controller]);
   const requestOpen = React.useCallback(() => {
+    if (!controller) return false;
     const openedImmediately = controller.open();
     if (!openedImmediately) {
       setLauncherState((prev) => ({ ...prev, pending: true, unavailable: false }));
@@ -411,11 +414,11 @@ function useChatwoot() {
         requestOpen();
       },
       close: () => {
-        controller.close();
+        controller?.close();
       },
       toggle: () => {
         if (launcherState.widgetOpen) {
-          controller.close();
+          controller?.close();
         } else {
           requestOpen();
         }

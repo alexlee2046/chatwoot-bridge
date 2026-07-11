@@ -10,7 +10,11 @@ export interface ChatwootLauncherState {
 }
 
 export interface ChatwootContextValue {
-  controller: ChatwootBridgeController;
+  // Null for the brief window between the Provider mounting and its
+  // creation effect running (see below) — practically imperceptible, but
+  // real, since the controller is now created inside useEffect rather than
+  // synchronously in the render body.
+  controller: ChatwootBridgeController | null;
   launcherState: ChatwootLauncherState;
   requestOpen: () => boolean;
 }
@@ -24,59 +28,75 @@ export interface ChatwootProviderProps {
   children: React.ReactNode;
 }
 
+const IDLE_LAUNCHER_STATE: ChatwootLauncherState = {
+  state: "idle",
+  pending: false,
+  unavailable: false,
+  widgetOpen: false,
+};
+
 export function ChatwootProvider(props: ChatwootProviderProps): JSX.Element {
   const { config, locale, user, children } = props;
 
-  const controllerRef = React.useRef<ChatwootBridgeController>();
-  if (!controllerRef.current) {
-    controllerRef.current = createChatwootBridge(config);
-  }
-  const controller = controllerRef.current;
-
-  const [launcherState, setLauncherState] = React.useState<ChatwootLauncherState>(() => ({
-    state: controller.state,
-    pending: false,
-    unavailable: controller.state === "unavailable",
-    widgetOpen: false,
-  }));
+  // Created inside an effect (not a lazily-initialized ref) so React
+  // StrictMode's dev-only mount→cleanup→remount simulation gets a genuinely
+  // fresh controller on remount. A ref-based singleton can't survive that:
+  // the simulation re-invokes the SAME captured effect closures (same
+  // `controller` variable) rather than re-rendering, so a fresh render
+  // never happens for a ref-guard to matter — cleanup would destroy the one
+  // and only controller, and "remount" would just re-subscribe onto the
+  // now-dead instance. Creating it in the effect means cleanup destroys
+  // *this* run's instance and setup always makes a new, live one.
+  const [controller, setController] = React.useState<ChatwootBridgeController | null>(null);
+  const [launcherState, setLauncherState] = React.useState<ChatwootLauncherState>(IDLE_LAUNCHER_STATE);
 
   React.useEffect(() => {
+    const instance = createChatwootBridge(config);
+    setController(instance);
+    setLauncherState({
+      state: instance.state,
+      pending: false,
+      unavailable: instance.state === "unavailable",
+      widgetOpen: false,
+    });
+
     const unsubscribers = [
-      controller.on("ready", () => {
-        setLauncherState((prev) => ({ ...prev, state: controller.state, pending: false }));
+      instance.on("ready", () => {
+        setLauncherState((prev) => ({ ...prev, state: instance.state, pending: false }));
       }),
-      controller.on("opened", () => {
+      instance.on("opened", () => {
         setLauncherState((prev) => ({ ...prev, widgetOpen: true, pending: false }));
       }),
-      controller.on("closed", () => {
+      instance.on("closed", () => {
         setLauncherState((prev) => ({ ...prev, widgetOpen: false }));
       }),
-      controller.on("unavailable", () => {
+      instance.on("unavailable", () => {
         setLauncherState((prev) => ({ ...prev, state: "unavailable", unavailable: true, pending: false }));
       }),
     ];
+
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
+      instance.destroy();
+      setController(null);
     };
-  }, [controller]);
+    // `config` is a module-level/memoized constant in every known caller —
+    // an identity change intentionally tears down and recreates the bridge.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config]);
 
   React.useEffect(() => {
-    controller.setLocale(locale);
+    controller?.setLocale(locale);
   }, [controller, locale]);
 
   React.useEffect(() => {
-    if (user?.email) {
+    if (controller && user?.email) {
       controller.setUser(user.email, user);
     }
   }, [controller, user?.email, user?.name]);
 
-  React.useEffect(() => {
-    return () => {
-      controller.destroy();
-    };
-  }, [controller]);
-
   const requestOpen = React.useCallback((): boolean => {
+    if (!controller) return false;
     const openedImmediately = controller.open();
     if (!openedImmediately) {
       setLauncherState((prev) => ({ ...prev, pending: true, unavailable: false }));
