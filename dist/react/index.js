@@ -383,7 +383,7 @@ function ChatwootProvider(props) {
   const requestOpen = React.useCallback(() => {
     const openedImmediately = controller.open();
     if (!openedImmediately) {
-      setLauncherState((prev) => ({ ...prev, pending: true }));
+      setLauncherState((prev) => ({ ...prev, pending: true, unavailable: false }));
     }
     return openedImmediately;
   }, [controller]);
