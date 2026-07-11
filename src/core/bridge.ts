@@ -22,6 +22,13 @@ export function createChatwootBridge(config: ChatwootBridgeConfig): ChatwootBrid
   let widgetOpen = false;
   let scriptRequested = false;
   let destroyed = false;
+  let pendingUser: { identifier: string; user: { name?: string; email?: string } } | undefined;
+
+  function applyUser(identifier: string, user: { name?: string; email?: string }): void {
+    if (typeof window !== "undefined" && window.$chatwoot) {
+      window.$chatwoot.setUser(identifier, user);
+    }
+  }
 
   const events = createEventBridge(unavailableEventName);
   const retry = createRetryController({
@@ -41,6 +48,7 @@ export function createChatwootBridge(config: ChatwootBridgeConfig): ChatwootBrid
   const unsubscribers = [
     events.on("ready", () => {
       state = "ready";
+      if (pendingUser) applyUser(pendingUser.identifier, pendingUser.user);
       if (reportContextOn.includes("ready")) reportContext();
     }),
     events.on("opened", () => {
@@ -52,6 +60,7 @@ export function createChatwootBridge(config: ChatwootBridgeConfig): ChatwootBrid
     }),
     events.on("unavailable", () => {
       state = "unavailable";
+      scriptRequested = false;
     }),
   ];
 
@@ -109,9 +118,8 @@ export function createChatwootBridge(config: ChatwootBridgeConfig): ChatwootBrid
 
   function setUser(identifier: string, user: { name?: string; email?: string }): void {
     if (destroyed) return;
-    if (typeof window !== "undefined" && window.$chatwoot) {
-      window.$chatwoot.setUser(identifier, user);
-    }
+    pendingUser = { identifier, user };
+    applyUser(identifier, user);
   }
 
   function updateContext(attrs?: Record<string, string>): void {

@@ -37,7 +37,14 @@ function loadChatwootScript(options, onReady, onError) {
   const existing = document.getElementById(options.scriptId);
   if (existing) {
     existing.addEventListener("load", onReady, { once: true });
-    existing.addEventListener("error", onError, { once: true });
+    existing.addEventListener(
+      "error",
+      () => {
+        existing.remove();
+        onError();
+      },
+      { once: true }
+    );
     return;
   }
   const script = document.createElement("script");
@@ -56,7 +63,14 @@ function loadChatwootScript(options, onReady, onError) {
     },
     { once: true }
   );
-  script.addEventListener("error", onError, { once: true });
+  script.addEventListener(
+    "error",
+    () => {
+      script.remove();
+      onError();
+    },
+    { once: true }
+  );
   document.head.appendChild(script);
 }
 
@@ -199,6 +213,12 @@ function createChatwootBridge(config) {
   let widgetOpen = false;
   let scriptRequested = false;
   let destroyed = false;
+  let pendingUser;
+  function applyUser(identifier, user) {
+    if (typeof window !== "undefined" && window.$chatwoot) {
+      window.$chatwoot.setUser(identifier, user);
+    }
+  }
   const events = createEventBridge(unavailableEventName);
   const retry = createRetryController({
     openRetryLimit: config.openRetryLimit ?? 40,
@@ -215,6 +235,7 @@ function createChatwootBridge(config) {
   const unsubscribers = [
     events.on("ready", () => {
       state = "ready";
+      if (pendingUser) applyUser(pendingUser.identifier, pendingUser.user);
       if (reportContextOn.includes("ready")) reportContext();
     }),
     events.on("opened", () => {
@@ -226,6 +247,7 @@ function createChatwootBridge(config) {
     }),
     events.on("unavailable", () => {
       state = "unavailable";
+      scriptRequested = false;
     })
   ];
   function ensureScriptLoaded() {
@@ -276,9 +298,8 @@ function createChatwootBridge(config) {
   }
   function setUser(identifier, user) {
     if (destroyed) return;
-    if (typeof window !== "undefined" && window.$chatwoot) {
-      window.$chatwoot.setUser(identifier, user);
-    }
+    pendingUser = { identifier, user };
+    applyUser(identifier, user);
   }
   function updateContext(attrs) {
     if (destroyed) return;

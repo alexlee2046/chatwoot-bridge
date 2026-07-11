@@ -19,7 +19,14 @@ export function loadChatwootScript(
   const existing = document.getElementById(options.scriptId);
   if (existing) {
     existing.addEventListener("load", onReady, { once: true });
-    existing.addEventListener("error", onError, { once: true });
+    existing.addEventListener(
+      "error",
+      () => {
+        existing.remove();
+        onError();
+      },
+      { once: true },
+    );
     return;
   }
 
@@ -39,6 +46,13 @@ export function loadChatwootScript(
     },
     { once: true },
   );
-  script.addEventListener("error", onError, { once: true });
+  script.addEventListener(
+    "error",
+    () => {
+      script.remove();
+      onError();
+    },
+    { once: true },
+  );
   document.head.appendChild(script);
 }
