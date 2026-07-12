@@ -26,5 +26,13 @@ export function buildChatwootSettings(
 
 export function applyChatwootSettings(config: ChatwootBridgeConfig, locale: string): void {
   if (typeof window === "undefined") return;
-  window.chatwootSettings = buildChatwootSettings(config, locale);
+  // Merge onto whatever's already there (e.g. a GTM snippet, or another
+  // script on the page, may have set window.chatwootSettings fields before
+  // this runs) rather than overwriting wholesale — all three pre-migration
+  // site implementations did this merge, and dropping it would silently
+  // clobber anything set outside the bridge.
+  window.chatwootSettings = {
+    ...(window.chatwootSettings || {}),
+    ...buildChatwootSettings(config, locale),
+  };
 }

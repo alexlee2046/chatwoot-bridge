@@ -85,9 +85,21 @@ export function ChatwootProvider(props: ChatwootProviderProps): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config]);
 
+  // Skips exactly one setLocale() call: the first one to run once `controller`
+  // exists, if `locale` is already what `config.locale` seeded into the
+  // eager settings write. Consumers that pre-seed config.locale to avoid a
+  // redundant settings write on mount get what they're actually asking for;
+  // consumers that don't (config.locale left undefined) see no behavior
+  // change — this never skips a genuine locale change afterward.
+  const skippedInitialLocaleSyncRef = React.useRef(false);
   React.useEffect(() => {
-    controller?.setLocale(locale);
-  }, [controller, locale]);
+    if (!controller) return;
+    if (!skippedInitialLocaleSyncRef.current) {
+      skippedInitialLocaleSyncRef.current = true;
+      if (locale === config.locale) return;
+    }
+    controller.setLocale(locale);
+  }, [controller, locale, config.locale]);
 
   React.useEffect(() => {
     if (controller && user?.email) {

@@ -11,6 +11,10 @@ export interface RetryOptions {
 export interface RetryController {
   attemptOpen(): boolean;
   cancel(): void;
+  // Called when the real chatwoot:ready DOM event fires — if an open() is
+  // queued waiting for the SDK, this lets it resolve immediately instead of
+  // waiting up to openRetryMs for the next poll tick.
+  notifyReady(): void;
 }
 
 function tryOpenNow(): boolean {
@@ -20,7 +24,7 @@ function tryOpenNow(): boolean {
   return true;
 }
 
-function isChatwootFrameVisible(): boolean {
+export function isChatwootFrameVisible(): boolean {
   if (typeof window === "undefined" || typeof document === "undefined") return false;
 
   const widget = document.getElementById("chatwoot_live_chat_widget");
@@ -109,5 +113,16 @@ export function createRetryController(options: RetryOptions): RetryController {
     clearTimer();
   }
 
-  return { attemptOpen, cancel };
+  function notifyReady(): void {
+    if (!pending) return;
+    if (tryOpenNow()) {
+      clearTimer();
+      settle();
+    }
+    // If tryOpenNow() still fails right at the ready event (window.$chatwoot
+    // exists per the caller, but toggle() itself declined), the already-
+    // scheduled poll timer is left running as the fallback.
+  }
+
+  return { attemptOpen, cancel, notifyReady };
 }

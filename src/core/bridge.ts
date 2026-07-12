@@ -1,7 +1,7 @@
 import { applyChatwootSettings } from "./settings";
 import { loadChatwootScript } from "./loader";
 import { createEventBridge, dispatchUnavailable } from "./events";
-import { createRetryController } from "./retry";
+import { createRetryController, isChatwootFrameVisible } from "./retry";
 import type {
   BridgeState,
   ChatwootBridgeConfig,
@@ -41,7 +41,10 @@ export function createChatwootBridge(config: ChatwootBridgeConfig): ChatwootBrid
 
   function reportContext(): void {
     if (!config.getContext) return;
-    if (typeof window === "undefined" || !window.$chatwoot) return;
+    // Checking the method itself, not just window.$chatwoot's presence —
+    // some SDK init sequences can expose the object slightly before every
+    // method is attached to it.
+    if (typeof window === "undefined" || !window.$chatwoot?.setConversationCustomAttributes) return;
     window.$chatwoot.setConversationCustomAttributes(config.getContext());
   }
 
@@ -50,8 +53,20 @@ export function createChatwootBridge(config: ChatwootBridgeConfig): ChatwootBrid
       state = "ready";
       if (pendingUser) applyUser(pendingUser.identifier, pendingUser.user);
       if (reportContextOn.includes("ready")) reportContext();
+      // A queued open() shouldn't have to wait for the next poll tick once
+      // the SDK actually signals ready.
+      retry.notifyReady();
     }),
     events.on("opened", () => {
+      // Chatwoot's own "opened" event means its internal state toggled open,
+      // not necessarily that the frame rendered visibly (CSS conflict /
+      // viewport edge case). When verifyOpen is configured we hold the same
+      // bar here that attemptOpen()'s own settle() does, rather than trusting
+      // the raw event unconditionally.
+      if (config.verifyOpen && !isChatwootFrameVisible()) {
+        dispatchUnavailable(unavailableEventName);
+        return;
+      }
       widgetOpen = true;
       if (reportContextOn.includes("opened")) reportContext();
     }),
@@ -124,13 +139,18 @@ export function createChatwootBridge(config: ChatwootBridgeConfig): ChatwootBrid
 
   function updateContext(attrs?: Record<string, string>): void {
     if (destroyed) return;
-    if (typeof window === "undefined" || !window.$chatwoot) return;
+    if (typeof window === "undefined" || !window.$chatwoot?.setConversationCustomAttributes) return;
     const resolved = attrs ?? config.getContext?.();
     if (resolved) window.$chatwoot.setConversationCustomAttributes(resolved);
   }
 
   function destroy(): void {
     if (destroyed) return;
+    // Close the widget before tearing down — otherwise a consumer that
+    // unmounts its Provider (route change, conditional render) leaves
+    // Chatwoot's iframe/bubble floating on a page it no longer belongs to,
+    // since nothing else would ever call close() for it again.
+    if (widgetOpen) close();
     destroyed = true;
     unsubscribers.forEach((unsubscribe) => unsubscribe());
     retry.cancel();

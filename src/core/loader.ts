@@ -49,6 +49,11 @@ export function loadChatwootScript(
   script.addEventListener(
     "error",
     () => {
+      // Pre-migration site implementations all logged something here — the
+      // only observable trace of an SDK load failure otherwise is the
+      // unavailable event, which is silent if nothing on the page happens
+      // to listen for it.
+      console.warn(`@mwl/chatwoot-bridge: failed to load Chatwoot SDK from ${options.baseUrl}`);
       script.remove();
       onError();
     },

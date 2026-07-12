@@ -24,7 +24,10 @@ function buildChatwootSettings(config, locale) {
 }
 function applyChatwootSettings(config, locale) {
   if (typeof window === "undefined") return;
-  window.chatwootSettings = buildChatwootSettings(config, locale);
+  window.chatwootSettings = {
+    ...window.chatwootSettings || {},
+    ...buildChatwootSettings(config, locale)
+  };
 }
 
 // src/core/loader.ts
@@ -66,6 +69,7 @@ function loadChatwootScript(options, onReady, onError) {
   script.addEventListener(
     "error",
     () => {
+      console.warn(`@mwl/chatwoot-bridge: failed to load Chatwoot SDK from ${options.baseUrl}`);
       script.remove();
       onError();
     },
@@ -197,7 +201,14 @@ function createRetryController(options) {
     attempts = 0;
     clearTimer();
   }
-  return { attemptOpen, cancel };
+  function notifyReady() {
+    if (!pending) return;
+    if (tryOpenNow()) {
+      clearTimer();
+      settle();
+    }
+  }
+  return { attemptOpen, cancel, notifyReady };
 }
 
 // src/core/bridge.ts
@@ -229,7 +240,7 @@ function createChatwootBridge(config) {
   });
   function reportContext() {
     if (!config.getContext) return;
-    if (typeof window === "undefined" || !window.$chatwoot) return;
+    if (typeof window === "undefined" || !window.$chatwoot?.setConversationCustomAttributes) return;
     window.$chatwoot.setConversationCustomAttributes(config.getContext());
   }
   const unsubscribers = [
@@ -237,8 +248,13 @@ function createChatwootBridge(config) {
       state = "ready";
       if (pendingUser) applyUser(pendingUser.identifier, pendingUser.user);
       if (reportContextOn.includes("ready")) reportContext();
+      retry.notifyReady();
     }),
     events.on("opened", () => {
+      if (config.verifyOpen && !isChatwootFrameVisible()) {
+        dispatchUnavailable(unavailableEventName);
+        return;
+      }
       widgetOpen = true;
       if (reportContextOn.includes("opened")) reportContext();
     }),
@@ -303,12 +319,13 @@ function createChatwootBridge(config) {
   }
   function updateContext(attrs) {
     if (destroyed) return;
-    if (typeof window === "undefined" || !window.$chatwoot) return;
+    if (typeof window === "undefined" || !window.$chatwoot?.setConversationCustomAttributes) return;
     const resolved = attrs ?? config.getContext?.();
     if (resolved) window.$chatwoot.setConversationCustomAttributes(resolved);
   }
   function destroy() {
     if (destroyed) return;
+    if (widgetOpen) close();
     destroyed = true;
     unsubscribers.forEach((unsubscribe) => unsubscribe());
     retry.cancel();

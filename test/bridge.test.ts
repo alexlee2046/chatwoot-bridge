@@ -63,6 +63,75 @@ describe("identify-before-ready race", () => {
   });
 });
 
+describe("destroy closes an open widget", () => {
+  it("calls close() before tearing down if the widget is open", () => {
+    const toggleSpy = vi.fn();
+    const widgetApi: ChatwootWidgetApi = {
+      toggle: toggleSpy,
+      setUser: vi.fn(),
+      setLocale: vi.fn(),
+      setConversationCustomAttributes: vi.fn(),
+    };
+    (window as unknown as { $chatwoot: ChatwootWidgetApi }).$chatwoot = widgetApi;
+
+    const bridge = createChatwootBridge({
+      baseUrl: "https://chatwoot.example.com",
+      websiteToken: "token",
+      scriptId: "test-chatwoot-sdk-destroy-open",
+      loadStrategy: "lazy",
+    });
+
+    window.dispatchEvent(new CustomEvent("chatwoot:opened"));
+    bridge.destroy();
+
+    expect(toggleSpy).toHaveBeenCalledWith("close");
+  });
+
+  it("does not call close() if the widget was never opened", () => {
+    const toggleSpy = vi.fn();
+    const widgetApi: ChatwootWidgetApi = {
+      toggle: toggleSpy,
+      setUser: vi.fn(),
+      setLocale: vi.fn(),
+      setConversationCustomAttributes: vi.fn(),
+    };
+    (window as unknown as { $chatwoot: ChatwootWidgetApi }).$chatwoot = widgetApi;
+
+    const bridge = createChatwootBridge({
+      baseUrl: "https://chatwoot.example.com",
+      websiteToken: "token",
+      scriptId: "test-chatwoot-sdk-destroy-closed",
+      loadStrategy: "lazy",
+    });
+
+    bridge.destroy();
+
+    expect(toggleSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("settings merge", () => {
+  it("merges onto an existing window.chatwootSettings instead of overwriting it", () => {
+    (window as unknown as { chatwootSettings?: Record<string, unknown> }).chatwootSettings = {
+      launcherTitle: "set by some other script",
+    };
+
+    const bridge = createChatwootBridge({
+      baseUrl: "https://chatwoot.example.com",
+      websiteToken: "token",
+      scriptId: "test-chatwoot-sdk-settings-merge",
+      loadStrategy: "eager",
+    });
+
+    const settings = (window as unknown as { chatwootSettings: Record<string, unknown> }).chatwootSettings;
+    expect(settings.launcherTitle).toBe("set by some other script");
+    expect(settings.position).toBe("right");
+
+    bridge.destroy();
+    delete (window as unknown as { chatwootSettings?: unknown }).chatwootSettings;
+  });
+});
+
 describe("context reporting", () => {
   it("reports page context via setConversationCustomAttributes, not the contact-level setCustomAttributes", () => {
     const setConversationCustomAttributesSpy = vi.fn();
