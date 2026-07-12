@@ -422,22 +422,32 @@ function useChatwoot() {
         } else {
           requestOpen();
         }
+      },
+      updateContext: (attrs) => {
+        controller?.updateContext(attrs);
       }
     }),
     [controller, requestOpen, launcherState.widgetOpen]
   );
 }
 function useChatwootLauncher() {
-  const { launcherState, requestOpen } = useChatwootContext();
+  const { controller, launcherState, requestOpen } = useChatwootContext();
   const open = React2.useCallback(() => {
     requestOpen();
   }, [requestOpen]);
+  const updateContext = React2.useCallback(
+    (attrs) => {
+      controller?.updateContext(attrs);
+    },
+    [controller]
+  );
   return {
     state: launcherState.state,
     pending: launcherState.pending,
     unavailable: launcherState.unavailable,
     widgetOpen: launcherState.widgetOpen,
-    open
+    open,
+    updateContext
   };
 }
 export {

@@ -1,6 +1,6 @@
 {
   "name": "@mwl/chatwoot-bridge",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "type": "module",
   "description": "Framework-agnostic Chatwoot widget bridge shared across MWL Group sites.",
   "exports": {

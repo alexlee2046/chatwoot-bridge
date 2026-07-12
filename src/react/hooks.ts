@@ -14,6 +14,7 @@ export function useChatwoot(): {
   open: () => void;
   close: () => void;
   toggle: () => void;
+  updateContext: (attrs?: Record<string, string>) => void;
 } {
   const { controller, launcherState, requestOpen } = useChatwootContext();
 
@@ -32,6 +33,9 @@ export function useChatwoot(): {
           requestOpen();
         }
       },
+      updateContext: (attrs?: Record<string, string>) => {
+        controller?.updateContext(attrs);
+      },
     }),
     [controller, requestOpen, launcherState.widgetOpen],
   );
@@ -43,12 +47,20 @@ export function useChatwootLauncher(): {
   unavailable: boolean;
   widgetOpen: boolean;
   open: () => void;
+  updateContext: (attrs?: Record<string, string>) => void;
 } {
-  const { launcherState, requestOpen } = useChatwootContext();
+  const { controller, launcherState, requestOpen } = useChatwootContext();
 
   const open = React.useCallback(() => {
     requestOpen();
   }, [requestOpen]);
+
+  const updateContext = React.useCallback(
+    (attrs?: Record<string, string>) => {
+      controller?.updateContext(attrs);
+    },
+    [controller],
+  );
 
   return {
     state: launcherState.state,
@@ -56,5 +68,6 @@ export function useChatwootLauncher(): {
     unavailable: launcherState.unavailable,
     widgetOpen: launcherState.widgetOpen,
     open,
+    updateContext,
   };
 }

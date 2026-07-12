@@ -89,6 +89,7 @@ declare function useChatwoot(): {
     open: () => void;
     close: () => void;
     toggle: () => void;
+    updateContext: (attrs?: Record<string, string>) => void;
 };
 declare function useChatwootLauncher(): {
     state: BridgeState;
@@ -96,6 +97,7 @@ declare function useChatwootLauncher(): {
     unavailable: boolean;
     widgetOpen: boolean;
     open: () => void;
+    updateContext: (attrs?: Record<string, string>) => void;
 };
 
 export { type BridgeEvent, type BridgeState, type ChatwootBridgeConfig, type ChatwootBridgeController, type ChatwootMessageStrings, ChatwootProvider, type ChatwootProviderProps, type LocaleMessages, useChatwoot, useChatwootLauncher };
